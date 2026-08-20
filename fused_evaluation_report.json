@@ -1,0 +1,255 @@
+{
+  "n_videos": 240,
+  "n_fused_features": 22,
+  "pca_components_kept": 13,
+  "pca_variance_retained": 0.9239260340005797,
+  "pca_top_features": {
+    "PC1": [
+      [
+        "n_frames_with_face",
+        0.46
+      ],
+      [
+        "n_frames_sampled",
+        0.46
+      ],
+      [
+        "duration_s",
+        0.45
+      ]
+    ],
+    "PC2": [
+      [
+        "eye_openness_mean",
+        0.41
+      ],
+      [
+        "energy_mean_rms",
+        0.4
+      ],
+      [
+        "energy_var_rms",
+        0.38
+      ]
+    ],
+    "PC3": [
+      [
+        "pitch_var_hz",
+        0.5
+      ],
+      [
+        "pitch_mean_hz",
+        0.47
+      ],
+      [
+        "head_pitch_var",
+        0.29
+      ]
+    ],
+    "PC4": [
+      [
+        "head_yaw_mean",
+        0.35
+      ],
+      [
+        "head_pitch_var",
+        0.31
+      ],
+      [
+        "energy_var_rms",
+        0.31
+      ]
+    ],
+    "PC5": [
+      [
+        "head_roll_var",
+        0.48
+      ],
+      [
+        "head_pitch_var",
+        0.45
+      ],
+      [
+        "mouth_openness_var",
+        0.43
+      ]
+    ],
+    "PC6": [
+      [
+        "mean_pause_duration_s",
+        0.51
+      ],
+      [
+        "n_pauses",
+        0.49
+      ],
+      [
+        "eye_openness_var",
+        0.27
+      ]
+    ],
+    "PC7": [
+      [
+        "head_yaw_mean",
+        0.5
+      ],
+      [
+        "energy_var_rms",
+        -0.35
+      ],
+      [
+        "energy_mean_rms",
+        -0.34
+      ]
+    ],
+    "PC8": [
+      [
+        "head_pitch_mean",
+        0.64
+      ],
+      [
+        "head_roll_mean",
+        -0.37
+      ],
+      [
+        "speech_ratio",
+        0.33
+      ]
+    ],
+    "PC9": [
+      [
+        "speech_ratio",
+        0.64
+      ],
+      [
+        "speaking_rate_proxy_hz",
+        -0.48
+      ],
+      [
+        "eye_openness_var",
+        -0.28
+      ]
+    ],
+    "PC10": [
+      [
+        "head_yaw_var",
+        0.78
+      ],
+      [
+        "head_yaw_mean",
+        -0.36
+      ],
+      [
+        "head_pitch_mean",
+        -0.25
+      ]
+    ],
+    "PC11": [
+      [
+        "eye_openness_var",
+        0.46
+      ],
+      [
+        "head_pitch_mean",
+        -0.42
+      ],
+      [
+        "head_roll_mean",
+        0.33
+      ]
+    ],
+    "PC12": [
+      [
+        "speaking_rate_proxy_hz",
+        0.48
+      ],
+      [
+        "head_roll_mean",
+        0.48
+      ],
+      [
+        "eye_openness_var",
+        -0.45
+      ]
+    ],
+    "PC13": [
+      [
+        "eye_openness_mean",
+        0.68
+      ],
+      [
+        "head_roll_var",
+        0.39
+      ],
+      [
+        "speech_ratio",
+        0.33
+      ]
+    ]
+  },
+  "internal_validity": {
+    "best_k": 4,
+    "best_silhouette": 0.13591302047344217,
+    "sweep": {
+      "2": 0.12276327383518588,
+      "3": 0.11957220084354464,
+      "4": 0.13591302047344217
+    }
+  },
+  "stability_bootstrap": {
+    "mean_ari": 0.6262688803876194,
+    "std_ari": 0.1682805158781339,
+    "n_bootstrap": 20
+  },
+  "cross_modal_agreement": {
+    "r": 0.04826292979231713,
+    "p_value": 0.45674559852146235,
+    "n": 240
+  },
+  "face_validity": {
+    "eye_openness_mean": {
+      "observed_range": [
+        0.039569079699326645,
+        0.3535619591071307
+      ],
+      "expected_range": [
+        0.0,
+        1.0
+      ],
+      "fraction_in_expected_range": 1.0
+    },
+    "mouth_openness_mean": {
+      "observed_range": [
+        0.04202486931767547,
+        0.2505489933957523
+      ],
+      "expected_range": [
+        0.0,
+        1.5
+      ],
+      "fraction_in_expected_range": 1.0
+    },
+    "pitch_mean_hz": {
+      "observed_range": [
+        81.70956138098323,
+        896.371477248611
+      ],
+      "expected_range": [
+        60.0,
+        500.0
+      ],
+      "fraction_in_expected_range": 0.9583333333333334
+    },
+    "speech_ratio": {
+      "observed_range": [
+        0.511520737327189,
+        0.6280193236714976
+      ],
+      "expected_range": [
+        0.0,
+        1.0
+      ],
+      "fraction_in_expected_range": 1.0
+    }
+  }
+}
