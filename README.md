@@ -1,20 +1,17 @@
 # DepVidMood Coding Tasks — Solution
 
-Solution to the Stage-2 take-home assignment (facial feature extraction, audio feature
-extraction, multimodal fusion + evaluation without ground-truth labels).
+My solution for the Stage-2 take-home: face features, audio features, and combining
+the two + checking if it's any good without labels.
 
 ## Files
 
-- `face_features.py` — Task 1: face detection + landmark-based visual features (eye
-  openness, mouth openness, head pose) via MediaPipe Face Mesh.
-- `audio_features.py` — Task 2: pitch, energy, and speaking-rate/pause features via
-  librosa, with a simple energy-based voice-activity detector.
-- `multimodal_fusion.py` — Task 3: feature-level fusion of the two modalities, plus
-  four label-free evaluation strategies (internal validity/clustering, bootstrap
-  stability, cross-modal agreement, face-validity sanity checks).
-- `run_pipeline.py` — orchestrator: point it at a folder of videos and it runs all
-  three tasks end to end.
-- `requirements.txt` — pinned dependencies.
+- `face_features.py` — Task 1. Gets face landmarks with MediaPipe, then works out eye
+  openness, mouth openness, and head pose from them.
+- `audio_features.py` — Task 2. Pitch, energy, speaking rate/pauses, using librosa.
+- `multimodal_fusion.py` — Task 3. Combines both, then checks if the result means
+  anything using four different label-free checks.
+- `run_pipeline.py` — runs all three on a whole folder of videos at once.
+- `requirements.txt` — what to install.
 
 ## Setup
 
@@ -22,120 +19,136 @@ extraction, multimodal fusion + evaluation without ground-truth labels).
 pip install -r requirements.txt
 ```
 
-**Note on mediapipe:** the latest PyPI release (`1.0.x`) dropped the legacy
-`mp.solutions` API this code relies on, in favor of a newer Tasks API that needs a
-separately-downloaded model file. `requirements.txt` pins `mediapipe==0.10.14`, which
-still ships `mp.solutions.face_mesh` and needs no extra downloads. If you `pip install
-mediapipe` without the pin you will get an `AttributeError`.
+Heads up on mediapipe: the newest version on PyPI (1.0.x) removed the API this code
+uses, so `requirements.txt` pins it to `0.10.14` instead. If you install mediapipe
+without that pin you'll get an `AttributeError`.
 
-`ffmpeg` must also be available on the system PATH (used by `audio_features.py` to
-extract the audio track).
+You also need `ffmpeg` installed and on your PATH — that's what pulls the audio out
+of each video.
 
 ## Dataset
 
-[DepVidMood: Facial Expression Video Dataset](https://www.kaggle.com/datasets/ziya07/depvidmood-facial-expression-video-dataset)
-(Kaggle). Only the video files are used, per the task instructions.
+[DepVidMood on Kaggle](https://www.kaggle.com/datasets/ziya07/depvidmood-facial-expression-video-dataset).
 
-To download it:
 
-- **Via browser:** open the link above, sign in to Kaggle, and use the Download
-  button. This gives you a `.zip` — extract it anywhere, e.g. `~/data/depvidmood/`.
-- **Via Kaggle CLI** (if you have an API token set up at `~/.kaggle/kaggle.json`):
-  ```bash
-  pip install kaggle --break-system-packages
-  kaggle datasets download -d ziya07/depvidmood-facial-expression-video-dataset -p ./data --unzip
-  ```
-
-The dataset may contain nested subfolders (e.g. per class/session); `run_pipeline.py`
-searches recursively, so it doesn't matter how it's organized once extracted.
+Doesn't matter how the folders are nested inside — `run_pipeline.py` searches through
+subfolders automatically.
 
 ## Running
 
 ```bash
-python run_pipeline.py /path/to/extracted_dataset_folder --out ./results
+python run_pipeline.py /path/to/dataset --out ./results
 ```
 
-This writes `visual_features.csv`, `audio_features.csv`, and
-`fused_evaluation_report.json` to the output folder. Fusion/evaluation is skipped
-automatically if fewer than 3 videos have valid features (clustering isn't meaningful
-below that).
+Writes out `visual_features.csv`, `audio_features.csv`, and
+`fused_evaluation_report.json`. If fewer than 3 videos come through okay, it skips
+the fusion/clustering step since that needs more than 2-3 data points to mean
+anything.
 
-For a quick sanity check before running the full dataset (which can take a while —
-MediaPipe processes every sampled frame), use `--limit` to only process the first N
-videos found, and `--every` to skip frames:
+Worth testing on a handful of videos first rather than the whole dataset blind:
 
 ```bash
-python run_pipeline.py /path/to/extracted_dataset_folder --out ./results_test --limit 5 --every 3
+python run_pipeline.py /path/to/dataset --out ./results_test --limit 5 --every 3
 ```
 
-Once that runs cleanly and the CSVs look sensible, drop `--limit` (and reduce/drop
-`--every`) for the full run.
+Check the numbers look sane, then drop `--limit` for the real run.
 
-Each module can also be run standalone on a single video, e.g.:
+Each file also works on its own, on a single video:
 
 ```bash
 python face_features.py path/to/video.mp4 --every 2
 python audio_features.py path/to/video.mp4
 ```
 
-## Approach summary
+## How each part works
 
-**Task 1 (visual):** MediaPipe Face Mesh gives 468 landmarks per frame. From these,
-Eye Aspect Ratio and Mouth Aspect Ratio are computed as simple, interpretable
-openness proxies, and head pose (yaw/pitch/roll) is estimated with `solvePnP` against
-a generic 3D face model (camera intrinsics are approximated since the dataset has no
-calibration — standard practice for uncalibrated video). Per-frame values are
-aggregated to mean and variance per video; variance captures expressivity, not just
-average state.
+**Task 1, visual:** MediaPipe gives 468 points on the face per frame. From those I
+calculate eye openness and mouth openness as simple ratios, and head pose (which way
+the head is turned) using OpenCV's solvePnP against a generic face shape, since we
+don't have camera calibration info for this dataset. For each video I take the
+average and the variance of these over all frames — variance because how much
+something moves matters as much as its average value.
 
-**Task 2 (audio):** the audio track is extracted with ffmpeg, then librosa computes
-pitch (pYIN, voiced frames only), RMS energy, and — via a simple adaptive
-energy-threshold voice-activity detector — speech ratio, pause count/duration, and a
-coarse speaking-rate proxy from onset density. The raw frame-level VAD mask is noisy
-(brief energy dips inside continuous speech, or breath noise, flip the label for 1-2
-frames at a time), so it's smoothed with a median filter before pause statistics are
-computed — verified against a synthetic tone/silence test signal where the unsmoothed
-mask produced ~15 spurious "pauses" for what should have been 2.
+One thing worth knowing: eye/mouth openness use normal average/variance, but head
+pose angles don't — they use what's called circular variance instead. Angles wrap
+around (180° and -180° are basically the same direction), and normal variance
+doesn't know that. On the real dataset, a couple of videos had a head-pose variance
+number in the tens of thousands because of this, while all the others were single
+digits. Switched to circular stats and it fixed itself.
 
-**Task 3 (fusion + evaluation):** the two video-level feature vectors are
-concatenated and z-score standardized (early/feature-level fusion — chosen over a
-learned joint embedding because there are no labels to train one against, and
-concatenation keeps every fused dimension traceable to a named, interpretable
-signal). For evaluation without ground-truth labels, four label-free checks are
-implemented: (1) internal validity via KMeans + silhouette score — does the fused
-feature space have any coherent structure at all; (2) stability via bootstrap
-resampling + Adjusted Rand Index — is that structure robust to which videos happen to
-be sampled; (3) cross-modal agreement — do the independently-computed visual and
-audio "expressivity" indices correlate, which would suggest both modalities are
-picking up a shared real signal rather than each being noise; (4) face-validity
-checks — are feature values in the ranges the literature/domain knowledge would
-predict. A fifth strategy, robustness under input perturbation, is described in the
-code's module docstring but not run, since it requires re-extracting features from
-deliberately perturbed video/audio inputs.
+**Task 2, audio:** pull the audio out with ffmpeg, then get pitch (librosa's pYIN,
+only counting frames where someone's actually voicing), energy (RMS), and speaking
+rate/pauses from a simple loudness-based voice detector. That detector is noisy on
+its own — quiet moments mid-word get misread as pauses — so I smooth it with a
+median filter before counting pauses. Without that smoothing, a test clip with 2 real
+silences came out as ~15 "pauses."
 
-## Assumptions and simplifications
+**Task 3, fusion + evaluation without labels:** stick the visual and audio features
+together into one vector per video, scale everything so no single feature dominates
+just because of its units, then reduce it with PCA to cut down redundancy. No
+trained/learned fusion model, since there's nothing to train it against without
+labels — just combining features and keeping them traceable back to what they mean.
 
-- No ground-truth mood/affect labels are assumed to exist for this dataset, per the
-  task description — all of Task 3's evaluation is designed around that constraint.
-- The voice-activity detector is a simple adaptive-threshold method, not a trained
-  model; it can misclassify quiet speech as silence or background noise as speech.
-  This is a deliberate simplicity/interpretability trade-off, documented in
-  `audio_features.py`.
-- The speaking-rate feature is an onset-density proxy, not a true syllable or word
-  rate (that would require ASR/transcription, which the task doesn't call for).
-- Head pose uses generic (uncalibrated) camera intrinsics; angles are reliable for
-  relative comparison across frames/videos but not metrically precise.
-- Frames with no detected face are skipped (not imputed); `detection_rate` is
-  reported per video as a data-quality flag so low-quality videos are visible rather
-  than silently interpolated.
-- Missing values in the fused feature table are median-imputed before clustering.
+For checking if any of this is actually meaningful without ground truth, four things:
+cluster the videos and see if there's any real structure (silhouette score);
+re-cluster on random subsets and see if you get the same answer each time (bootstrap
++ ARI); check the feature values look plausible (pitch in normal human range, etc.);
+and check if visual "expressiveness" and audio "expressiveness" agree with each
+other across videos. A fifth idea — re-running everything on slightly altered
+video/audio to see if the features hold steady — is written up but not run, since it
+needs a second pass through Tasks 1/2.
+
+## Assumptions / things I simplified
+
+- Assuming there really are no mood labels for this dataset, per the task brief —
+  all of Task 3 is built around that.
+- The voice-activity detector is a simple threshold, not a trained model, so it can
+  get confused by quiet speech or background noise.
+- Speaking rate is a rough proxy (counting energy onsets), not real syllables — that
+  would need speech-to-text, which wasn't asked for.
+- Head pose angles are good for comparing across frames/videos, not for exact
+  degrees, since there's no camera calibration.
+- If no face is found in a frame, that frame is just skipped, not guessed at. Each
+  video reports what fraction of frames it actually found a face in.
+- Any missing values in the final combined table get filled with the median before
+  clustering.
 
 ## Testing
 
-The pipeline was validated end-to-end on synthetic data (a real face image from a
-standard test corpus, animated into short clips, paired with synthetic tone/silence
-audio tracks standing in for speech) rather than the actual DepVidMood dataset, which
-requires Kaggle credentials not available in the development environment. This caught
-and fixed two real bugs: the mediapipe API-version issue above, and the VAD
-smoothing issue described in Task 2. It does not substitute for running against real
-DepVidMood videos before the interview.
+Tried it first on made-up data (a face photo turned into a short video, with a fake
+tone-and-silence audio track standing in for speech), then ran it for real on the
+whole DepVidMood dataset — 240 videos, all processed fine.
+
+## Bugs I hit and fixed
+
+- **mediapipe broke immediately.** Newest version dropped the API I needed. Pinned
+  it to `0.10.14` in requirements.txt and it works.
+- **Pauses were way overcounted.** The raw voice detector flickers on/off for a
+  frame or two at a time even mid-speech. Added smoothing before counting pauses —
+  went from ~15 false pauses down to the correct 2 on my test clip.
+- **Head pose variance was way too high on a couple of real videos.** Turned out to
+  be the 180°/-180° wraparound problem described above. Fixed with circular
+  variance instead of normal variance.
+- **Couldn't tell what the PCA components actually meant.** Added a small function
+  that prints which original features drive each component the most, so it's not
+  just a black box.
+- **numpy/pandas broke on my Windows/Anaconda setup.** Mixing pip installs into an
+  existing Anaconda environment caused a version mismatch error. Made a fresh
+  virtual environment instead and installed everything clean there — fixed it.
+
+## What I actually found (240 videos)
+
+- PCA got the 22 features down to 13 without losing much (kept ~92% of the
+  variation). The single biggest factor turned out to be video length, not
+  anything about the person — pointing that out honestly rather than hiding it.
+- Clustering found some structure, but it's weak (silhouette ≈ 0.14). Not clean,
+  separate groups.
+- That weak structure held up reasonably well when I reran it on random subsets
+  (~63% agreement) — so it's weak, but not just noise either.
+- Visual expressiveness and audio expressiveness didn't line up with each other at
+  all (correlation ≈ 0.05, not statistically meaningful). Genuine negative result,
+  not spinning it as a win.
+- Feature values mostly look sane — eye/mouth openness and speech ratio all
+  reasonable, pitch reasonable for ~96% of videos. The rest showed pitch way too
+  high, most likely the pitch detector locking onto a harmonic rather than an
+  actual bug.
