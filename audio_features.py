@@ -1,6 +1,5 @@
 """
 Task 2: Audio Feature Extraction (Speech Modality)
-====================================================
 
 Pipeline per video:
     1. Extract the audio track with ffmpeg (mono, 16 kHz -- standard
@@ -20,19 +19,9 @@ Pipeline per video:
                 speaking rate -- documented as an approximation, since
                 no transcript/ASR is required by the task).
     3. Aggregate frame-level pitch/energy into mean & variance to align
-       with the video-level granularity used in Task 1, and report the
+       with the video-level granularity and report the
        scalar pause/speaking-rate statistics alongside them.
 
-Simplifications (documented for the README):
-    - The VAD is a simple adaptive-energy-threshold detector, not a
-      trained model (e.g. WebRTC VAD or a neural VAD). This is a
-      deliberate simplicity/interpretability trade-off, consistent
-      with the task's emphasis on "simple, interpretable" features --
-      but it is noted as a limitation: it can misclassify quiet speech
-      as silence or breathing/background noise as speech.
-    - Pitch is only computed over voiced frames (pYIN reports NaN /
-      unvoiced elsewhere); this avoids biasing the pitch mean/variance
-      with meaningless zeros during silence.
 """
 
 import subprocess
@@ -58,20 +47,7 @@ def extract_audio(video_path, sr=16000):
 
 def voice_activity_mask(y, sr, frame_length=1024, hop_length=256, energy_percentile=40,
                          min_run_ms=80):
-    """Very simple adaptive-threshold VAD: a frame is 'speech' if its RMS
-    energy exceeds a percentile-based threshold of the clip's own energy
-    distribution (adaptive to recording volume, per-clip).
-
-    A frame-by-frame threshold on its own is noisy -- energy can dip
-    briefly mid-word or spike briefly on breath noise, producing many
-    spurious 1-2-frame flips. To keep the resulting pause count
-    meaningful (and not just "how jittery was the energy signal"), we
-    smooth the raw mask with a minimum-run-length filter: any speech or
-    silence run shorter than `min_run_ms` gets merged into its
-    neighbour. This is a simplification, documented as such -- a
-    trained/neural VAD (e.g. WebRTC VAD) would handle this more
-    principled, but the smoothing filter keeps this simple detector
-    usable."""
+   
     rms = librosa.feature.rms(y=y, frame_length=frame_length, hop_length=hop_length)[0]
     threshold = np.percentile(rms, energy_percentile)
     raw_mask = rms > threshold
@@ -84,14 +60,7 @@ def voice_activity_mask(y, sr, frame_length=1024, hop_length=256, energy_percent
 
 
 def _smooth_min_run(mask, min_run_frames):
-    """Remove runs shorter than `min_run_frames` via a median filter
-    (majority vote in a sliding window). Unlike a single-pass
-    neighbour-merge, a median filter correctly collapses *cascading*
-    short runs (e.g. rapid alternation) in one shot rather than just
-    shifting the alternation by one frame -- verified against a
-    synthetic alternating-tone test signal during development, where a
-    naive single-pass merge only removed ~1 spurious transition instead
-    of the ~20+ actually present."""
+    
     mask = np.asarray(mask).astype(int)
     if len(mask) == 0:
         return mask.astype(bool)
@@ -106,13 +75,11 @@ def _smooth_min_run(mask, min_run_frames):
 
 
 def pause_statistics(speech_mask, sr, hop_length):
-    """Derive pause count / mean pause duration / speech ratio from a
-    boolean speech/silence frame mask."""
+    
     frame_duration = hop_length / sr
     speech_ratio = float(np.mean(speech_mask)) if len(speech_mask) else np.nan
 
-    # Find runs of False (silence) that are surrounded by speech somewhere
-    # in the clip -- i.e. count "pauses", not leading/trailing silence.
+    
     pauses = []
     in_pause = False
     pause_len = 0
@@ -139,9 +106,7 @@ def pause_statistics(speech_mask, sr, hop_length):
 
 
 def speaking_rate_proxy(y, sr, speech_mask, hop_length):
-    """Coarse syllable-rate proxy: count energy-onset peaks within speech
-    segments using librosa's onset detector, divide by total speech time.
-    This approximates speaking rate without requiring ASR/transcription."""
+    
     onset_env = librosa.onset.onset_strength(y=y, sr=sr, hop_length=hop_length)
     onsets = librosa.onset.onset_detect(onset_envelope=onset_env, sr=sr, hop_length=hop_length)
 
